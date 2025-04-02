@@ -1,0 +1,184 @@
+---
+title: "Portfolio task 4"
+format: html
+editor: visual
+---
+
+
+# Portfolio task 4
+
+## Synthetic controls
+
+```{r}
+library(plm)
+library(Synth)
+
+library(tidyverse)
+
+
+data <- read.csv("Store_data_2025.csv", sep=";")
+
+ dataprep.SC <- dataprep(
+       foo = data,
+       dependent = "p1sales",
+       unit.variable = "storeNum",
+       #unit.names.variable = "state",
+       time.predictors.prior = 1:78,
+       special.predictors = list(
+           list("p1sales", 1:78, "mean"),
+           list("p2sales", 1:78, "mean"),
+           list("p2prom", 1:78, "mean"),
+           list("p2price", 1:78, "mean"),
+           list("p1price", 1:78, "mean"),
+           list("p1prom", 1:78, "mean"),
+           list("compind", 1:78, "mean"),
+           list("storesize", 1:78, "mean"),
+           list("citysize", 1:78, "mean")),
+       time.variable = "Weekind",
+       treatment.identifier = 109,
+       controls.identifier = c(101:108,110:121),
+       time.optimize.ssr = 1:78,
+       time.plot = 1:104)
+```
+
+
+````{r}
+
+data.plot <- data %>% 
+  select(storeNum, Weekind, p1sales) %>% 
+  mutate(treated = storeNum == 109) %>% 
+  group_by(treated, Weekind) %>%
+  summarize_all(mean, .groups = "drop")
+
+ggplot(data.plot, aes(x = Weekind, y = p1sales, color = treated, group = treated)) +
+ geom_line(aes(linetype = treated), color = "black", linewidth = 1) +
+  scale_linetype_manual(values = c("dashed", "solid")) +
+  labs(title = "Sales of product 1: Treated vs. Untreated (1:104)",
+       x = "Weekind",
+       y = "p1sales",
+       color = "Treatment Status") +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.title = element_text(face = "bold"),
+    legend.title = element_text(face = "bold")
+  )
+
+
+```
+
+
+```{r}
+synth.out = synth(data.prep.obj = dataprep.SC)
+print(synth.tab(dataprep.res = dataprep.SC, synth.res = synth.out))
+
+```
+
+```{r}
+path.plot(synth.res = synth.out,
+            dataprep.res = dataprep.SC,
+            tr.intake = 78,
+            Ylab = c("Annual per capita cigarette sales"),
+            Xlab = c("year"),
+            Ylim = c(275,380),
+            Legend = c("Store 109","synthetic store"))
+
+```
+
+```{r}
+gaps.plot(synth.res = synth.out,
+           dataprep.res = dataprep.SC,
+           tr.intake = 78,
+           Ylab = c("Gap in annual per capita cigarette sales"),
+           Xlab = c("year"),
+           Ylim = c(-60,80))
+```
+
+
+
+
+
+```{r}
+diff.sales <- dataprep.SC$Y1plot - (dataprep.SC$Y0plot %*% synth.out$solution.w)
+post.dum <- 1:104>78
+
+mean(diff.sales[post.dum])
+
+```
+
+```{r}
+data <- read.csv("Store_data_W.csv", sep=",")
+df1 <- subset(data, select = -c(X, p2sales))
+df2 <- subset(data, select = -c(X, p1sales))
+
+```
+
+# sDiD
+
+
+````{r}
+library(synthdid)
+# Load the california data in approrpiate format for this analyis
+#data('california_prop99')
+
+# Prepare data further for the analysis
+dataprep.SDID <- panel.matrices(df1)
+
+# Run synthetic DID approach
+sdid.out <- synthdid_estimate(dataprep.SDID$Y, dataprep.SDID$N0, dataprep.SDID$T0)
+
+# Show main results
+summary(sdid.out)
+
+# Plot the results
+#plot(sdid.out)+theme_minimal()
+
+```
+
+```{r}
+plot(sdid.out)+theme_minimal()
+```
+
+
+```{r}
+
+dataprep.SC <- dataprep(
+       foo = data,
+       dependent = "p2sales",
+       unit.variable = "storeNum",
+       #unit.names.variable = "state",
+       time.predictors.prior = 1:78,
+       special.predictors = list(
+           list("p1sales", 1:78, "mean"),
+           list("p2sales", 1:78, "mean"),
+           list("p2prom", 1:78, "mean"),
+           list("p2price", 1:78, "mean"),
+           list("p1price", 1:78, "mean"),
+           list("p1prom", 1:78, "mean"),
+           list("compind", 1:78, "mean"),
+           list("storesize", 1:78, "mean"),
+           list("citysize", 1:78, "mean")),
+       time.variable = "Weekind",
+       treatment.identifier = 109,
+       controls.identifier = c(101:108,110:121),
+       time.optimize.ssr = 1:78,
+       time.plot = 1:104)
+
+dataprep.SDID <- panel.matrices(df2)
+
+# Run synthetic DID approach
+sdid.out <- synthdid_estimate(dataprep.SDID$Y, dataprep.SDID$N0, dataprep.SDID$T0)
+
+# Show main results
+summary(sdid.out)
+```
+
+
+
+```{r}
+plot(sdid.out)+theme_minimal()
+```
+
+
+
